@@ -1,18 +1,16 @@
 import os
 import sys
-import sqlite3
 from sqlite3 import Error
+from sqlalchemy import create_engine
+from sqlalchemy.ext.declarative import declarative_base
+from sqlalchemy import Column, Integer, String
+from sqlalchemy.orm import sessionmaker
+from sqlalchemy import MetaData
+from sqlalchemy import delete
 
 DELIMITERS = [" ", ",", ".", os.linesep, ]
 default_db_name = 'Basquare.sqlite3'
-table = {'name': 'WORDS_OCCURRENCE_TABLE',
-         'column_1': {'name':'id',
-                      'desc': 'integer PRIMARY KEY'},
-         'column_2': {'name': 'word',
-                      'desc': 'text'},
-         'column_3': {'name': 'count',
-                      'desc': 'integer'},
-         }
+table_name = 'WORDS_OCCURRENCE_TABLE'
 
 try:
     used_dir=sys.argv[1]
@@ -48,38 +46,40 @@ if db_file:
 else:
     db_file = os.path.join(used_dir, default_db_name)
 
-connection = None
 try:
-    connection = sqlite3.connect(db_file)
-    cursor = connection.cursor()
-    sql_drop_table = "DROP TABLE IF EXISTS {0};".format(table['name'])
-    cursor.execute(sql_drop_table)
-    sql_create_table = """CREATE TABLE {0} (
-                                            {1} {2},
-                                            {3} {4},
-                                            {5} {6}
-                                        ); """.format(table['name'],
-                                                      table['column_1']['name'],
-                                                      table['column_1']['desc'],
-                                                      table['column_2']['name'],
-                                                      table['column_2']['desc'],
-                                                      table['column_3']['name'],
-                                                      table['column_3']['desc'])
-    cursor.execute(sql_create_table)
+    engine = create_engine('sqlite://' + '/' + db_file)
+    print('engine =', engine)
+    Base = declarative_base()
+    print('Base =', Base)
+    metadata = MetaData()
+    metadata.reflect(bind=engine)
+    table = metadata.tables.get(table_name)
+    print('table =', table)
+    if table is not None:
+        # with DROP
+        # Base.metadata.drop_all(engine, [table], checkfirst=True)
+
+        # with DELETE
+        connection = engine.connect()
+        stmt = table.delete()
+        connection.execute(stmt)
+
+    class Words_occurrence_table(Base):
+        __tablename__ = table_name
+        id = Column(Integer, primary_key=True)
+        word = Column(String)
+        count = Column(Integer)
+
+    Base.metadata.create_all(engine)
+    Session = sessionmaker(bind=engine)
+    session = Session()
     for word, count in words_occurrence.items():
-        sql_insert_into_table = """INSERT INTO {0} ({1}, {2}) 
-                                   VALUES('{3}', {4}); """.format(table['name'],
-                                                                table['column_2']['name'],
-                                                                table['column_3']['name'],
-                                                                word,
-                                                                count)
-        cursor.execute(sql_insert_into_table)
+        row = Words_occurrence_table(word=word, count=count)
+        session.add(row)
 except Error as e:
     print(e)
 finally:
-    if connection:
-        connection.commit()
-        connection.close()
+    session.commit()
 
 
 
