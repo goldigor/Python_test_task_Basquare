@@ -48,13 +48,10 @@ else:
 
 try:
     engine = create_engine('sqlite://' + '/' + db_file)
-    print('engine =', engine)
     Base = declarative_base()
-    print('Base =', Base)
     metadata = MetaData()
     metadata.reflect(bind=engine)
     table = metadata.tables.get(table_name)
-    print('table =', table)
     if table is not None:
         # with DROP
         # Base.metadata.drop_all(engine, [table], checkfirst=True)
